@@ -1,0 +1,263 @@
+---
+title: "Exploratory Data Analysis"
+author: "Justin Edwards"
+date: "11/06/2014"
+output: html_document
+---
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r, cache=TRUE}
+## INITIALIZE
+library(tm)
+library(RWeka)
+
+set.seed(1234)
+
+
+## DOWNLOAD AND CLEAN DATA
+
+con <- file("final/en_US/en_US.twitter.txt", "r")
+en_US.twitter.sample <- readLines(con)
+close(con)
+en_US.twitter.sample <- sample(en_US.twitter.sample, size = 20000)
+
+con <- file("final/en_US/en_US.news.txt", "r")
+en_US.news <- readLines(con)
+close(con)
+en_US.news <- sample(en_US.news.sample, size = 20000)
+
+con <- file("final/en_US/en_US.blogs.txt", "r")
+en_US.blogs.sample <- readLines(con)
+close(con)
+en_US.blogs.sample <- sample(en_US.blogs.sample, size = 20000)
+
+write(en_US.twitter.sample, file = "train/en_US.twitter")
+write(en_US.blogs.sample, file = "train/en_US.blogs")
+write(en_US.news.sample, file = "train/en_US.news")
+
+corpUS_s <- VCorpus(x = DirSource("train/", encoding = "UTF-8"), readerControl = list(language = "en_US"))
+
+# Clean corpus
+removeProfaneWords <- function(x) removeWords(x, c("[^ ]*fuck[^ ]*", "[^ ]*shit[^ ]*","[^ ]*damn[^ ]*","[^ ]*asshole[^ ]*","dick","[^ ]*pussy[^ ]*","[^ ]*cocksucker[^ ]*","[^ ]*nigg[^ ]*"))
+fixCurlyQuote1 <- content_transformer(function(x) gsub(pattern = "(‘|’)", replacement = "'", x))
+fixCurlyQuote2 <- content_transformer(function(x) gsub(pattern = "(“|”)", replacement = "\"", x))
+separatePunct <- content_transformer(function(x) gsub(pattern = "(?!')([[:punct:]])", replacement = " \\1 ", x, perl=TRUE))
+removeSymbols <- content_transformer(function(x) gsub(pattern = "[^a-z| |0-9|.,;:=+-?!@#$%^&*()/'\"]", replacement = " ", x))
+standardNum <- content_transformer(function(x) gsub(pattern = "[[:digit:]]+", replacement = " ## ", x))
+
+funs <- list(standardNum, separatePunct, removeProfaneWords, removeSymbols, fixCurlyQuote1, fixCurlyQuote2) 
+corpUS_s_clean <- tm_map(corpUS_s, content_transformer(tolower))
+corpUS_s_clean <- tm_map(corpUS_s_clean, FUN = tm_reduce, tmFuns = funs)
+
+# plot cumulative frequency of words
+# for(i in seq.int(1,60000,10)) cum_plot[(i-1)/10+1] <- sum(head(n1Count, i))/sum(n1Count)
+# plot(seq.int(1,60000,10),cum_plot, type="l")
+
+```
+
+
+``` {r}
+## CREATE N-GRAMS
+library(RWeka)
+
+
+
+n1gram <- NGramTokenizer(c(corpUS_s_clean[[1]]$content,corpUS_s_clean[[2]]$content,corpUS_s_clean[[3]]$content), Weka_control(min = 1, max = 1, delimiters = ' '))
+n1Count <- sort(table(n1gram), decreasing = TRUE)
+n1gram <- factor(n1gram, levels = names(n1Count))
+
+
+
+
+n2gram <- NGramTokenizer(c(corpUS_s_clean[[1]]$content,corpUS_s_clean[[2]]$content,corpUS_s_clean[[3]]$content), Weka_control(min = 2, max = 2, delimiters = ' '))
+n2gram <- strsplit(split = " ", x = n2gram)
+n2gram <- as.data.frame(matrix(unlist(n2gram), ncol = 2, byrow = TRUE))
+
+n2gram$V1 <- factor(n2gram$V1, levels = names(n1Count))
+n2gram$V2 <- factor(n2gram$V2, levels = names(n1Count))
+
+
+n3gram <- NGramTokenizer(c(corpUS_s_clean[[1]]$content,corpUS_s_clean[[2]]$content,corpUS_s_clean[[3]]$content), Weka_control(min = 3, max = 3, delimiters = ' '))
+n3gram <- strsplit(split = " ", x = n3gram)
+n3gram <- lapply(n3gram, function(x) c(paste(x[1], x[2]),x[3]))
+n3gram <- as.data.frame(matrix(unlist(n3gram), ncol = 2, byrow = TRUE))
+n3Count <- sort(table(n3gram$V1), decreasing = TRUE)
+
+n3gram$V1 <- factor(n3gram$V1, levels = names(n3Count))
+n3gram$V2 <- factor(n3gram$V2, levels = names(n1Count))
+
+n3gram <- NGramTokenizer(c(corpUS_s_clean[[1]]$content,corpUS_s_clean[[2]]$content,corpUS_s_clean[[3]]$content), Weka_control(min = 3, max = 3, delimiters = ' '))
+n3gram <- strsplit(split = " ", x = n3gram)
+n3gram <- as.data.frame(matrix(unlist(n3gram), ncol = 3, byrow = TRUE))
+
+n3gram$V1 <- factor(n3gram$V1, levels = names(n1Count))
+n3gram$V2 <- factor(n3gram$V2, levels = names(n1Count))
+n3gram$V3 <- factor(n3gram$V3, levels = names(n1Count))
+
+
+n4gram <- NGramTokenizer(c(corpUS_s_clean[[1]]$content,corpUS_s_clean[[2]]$content,corpUS_s_clean[[3]]$content), Weka_control(min = 4, max = 4, delimiters = ' '))
+n4gram <- strsplit(split = " ", x = n4gram)
+n4gram <- as.data.frame(matrix(unlist(n4gram), ncol = 4, byrow = TRUE))
+
+# standardize the factors
+n4gram$V1 <- factor(n4gram$V1, levels = names(n1Count))
+n4gram$V2 <- factor(n4gram$V2, levels = names(n1Count))
+n4gram$V3 <- factor(n4gram$V3, levels = names(n1Count))
+n4gram$V4 <- factor(n4gram$V4, levels = names(n1Count))
+
+# create frequency table
+n2table <- xtabs(~ V1 + V2,n2gram, sparse = TRUE)
+n3table <- xtabs(~ V1 + V2,n3gram, sparse = TRUE)
+
+```
+
+
+```{r, cache=TRUE}
+
+## REDUCE DIMENSIONALITY VIA K-MEANS CLUSTERING
+
+# parameters
+numNNfeatures <- 500          # number of features to be used in the Neural Network (x3)
+numKmeanFeatures <- 500       # number of features to be used in the K-means Clustering (x2)
+numCommonWords <- 500       # number of words used in training set for K-means
+numCategWords <- 10000        # number of total words categorized (the rest are classified as "rare")
+
+# create training set of common words
+index_y <- colnames(n2table) %in% head(names(n1Count), numCommonWords)
+index_x <- rownames(n2table) %in% head(names(n1Count), numCategWords)
+
+n2tableCom <- t(apply(as.matrix(n2table[index_x,index_y]), 1, FUN = function(x) x/sum(x))) 
+n2tableCom_t <- t(apply(t(as.matrix(n2table[index_y,index_x])), 1, FUN = function(x) x/sum(x))) 
+n3tableCom <- t(apply(as.matrix(n3table[index_x,index_y]), 1, FUN = function(x) x/sum(x))) 
+n3tableCom_t <- t(apply(t(as.matrix(n3table[index_y,index_x])), 1, FUN = function(x) x/sum(x))) 
+
+n2tableCom[which(is.na(n2tableCom[,1])),] <- 1/dim(n2tableCom)[2]
+n2tableCom_t[which(is.na(n2tableCom_t[,1])),] <- 1/dim(n2tableCom_t)[2]
+n3tableCom[which(is.na(n3tableCom[,1])),] <- 1/dim(n3tableCom)[2]
+n3tableCom_t[which(is.na(n3tableCom_t[,1])),] <- 1/dim(n3tableCom_t)[2]
+
+tableCom <- cbind(n3tableCom_t, n2tableCom_t, n2tableCom, n3tableCom)
+rm(n3tableCom, n2tableCom, n2tableCom_t, n3tableCom_t)
+
+# create test set of rare words in order to find SSE on prediction
+# rindex_y <- colnames(n2table) %in% head(names(n1Count), numKmeanFeatures)
+# rindex_x <- rownames(n2table) %in% names(n1Count)[(numCommonWords+1):numCategWords]
+# 
+# n2tableRare <- t(apply(as.matrix(n2table[rindex_x,rindex_y]), 1, FUN = function(x) x/sum(x)))
+# n2tableRare_t <- t(apply(t(as.matrix(n2table[rindex_y,rindex_x])), 1, FUN = function(x) x/sum(x)))
+# n2tableRare[which(is.na(n2tableRare[,1])),] <- 1/dim(n2tableRare)[2]
+# n2tableRare_t[which(is.na(n2tableRare_t[,1])),] <- 1/dim(n2tableRare_t)[2]
+# n2tableRare <- cbind(n2tableRare,n2tableRare_t)
+# rm(n2tableRare_t)
+
+# find optimal number of reduced features
+sqError <- function(km,x) rowSums((as.data.frame(x) - km$centers[km$cluster,])^2)
+tot.sqError <- function(km,x,index) sum(sqError(km,x)[index]*n1Count[index])
+
+sqError <- function(km,x) rowSums((as.data.frame(x) - km$centers[km$cluster,])^2)
+tot.sqError <- function(km,x,index) sum(sqError(km,x)[index]*n1Count[index])
+
+
+wws <- data.frame(SSErare = numeric(0), SSEcom = numeric(0), totSSE = numeric(0))
+
+for (i in seq(405,500,10)) {
+                        j <- i/10
+                        kmn <- kmeans(tableComPC,i)
+                        #pred <- kmeans(n2tableRare, centers = kmn$centers)
+                        wws[j,] <- 0
+                        wws$SSEcom[j] <- tot.sqError(kmn,tableComPC,index =(numNNfeatures-i+1):numCategWords)
+                        #wws$SSErare[j] <- tot.sqError(kmn,n2tableRare,index = rindex_x)
+                        #wws$totSSE[j] <-  wws$SSEcom[j] + wws$SSErare[j]
+                        }
+plot(seq(5,40,5),wws$totSSE, type = "l")
+
+
+predRare <- kmeans(n2tableRare, centers = kmn$centers)
+
+
+
+```
+
+```{r, cache=TRUE}
+
+## REDUCE DIMENSIONALITY VIA PCA
+# parameters
+numNNfeatures <- 500          # number of features to be used in the Neural Network (x3)
+numKmeanFeatures <- 500       # number of features to be used in the K-means Clustering (x2)
+numCommonWords <- 500       # number of words used in training set for K-means
+numCategWords <- 10000        # number of total words categorized (the rest are classified as "rare")
+
+# create training set of common words
+# index_y <- colnames(n2table) %in% head(names(n1Count), numCommonWords)
+# index_x <- rownames(n2table) %in% head(names(n1Count), numCategWords)
+# 
+# n2tableCom <- t(apply(as.matrix(n2table[index_x,index_y]), 1, FUN = function(x) x/sum(x))) 
+# n2tableCom_t <- t(apply(t(as.matrix(n2table[index_y,index_x])), 1, FUN = function(x) x/sum(x))) 
+# n2tableCom[which(is.na(n2tableCom[,1])),] <- 1/dim(n2tableCom)[2]
+# n2tableCom_t[which(is.na(n2tableCom_t[,1])),] <- 1/dim(n2tableCom_t)[2]
+# n2tableCom <- cbind(n2tableCom, n2tableCom_t)
+# rm(n2tableCom_t)
+
+pc <- princomp(tableCom, score=TRUE)
+tableComPC <- pc$scores[,1:400]
+rm(tableCom, pc)
+
+optimRedFeat <- 125
+km <- kmeans(tableComPC,optimRedFeat)
+
+
+
+```
+
+
+
+```{r}
+# predict rest of word list with optimum k-means model
+
+for(i in 1:floor((numCategWords-numCommonWords)/10000)) {
+  rindex_y <- colnames(n2table) %in% head(names(n1Count), numKmeanFeatures)
+  rindex_x <- rownames(n2table) %in% names(n1Count)[(numCommonWords+10000*i+1):(numCommonWords+10000*(i+1))]
+  
+  n2tableRare <- as.matrix(n2table[rindex_x,rindex_y])
+  n2tableRare_t <- t(as.matrix(n2table[rindex_y,rindex_x]))
+  n2tableRare <- cbind(n2tableRare,n2tableRare_t)
+  n2tableRare[which(is.na(n2tableRNorm[,1])),] <- 1
+
+  predRare <- predict.kmeans(km, n2tableRNorm)
+}
+
+
+
+```
+
+
+
+
+``` {r}
+## NEURAL NETWORK
+optimRedFeat <- 125
+
+#create feature vectors
+featMap <- c(1:(numNNfeatures-optimRedFeat),((km$cluster[(numNNfeatures-optimRedFeat+1):length(km$cluster)])+(numNNfeatures-optimRedFeat)),rep(0, (length(n1Count))-length(km$cluster)))
+
+n4gramFeat <- data.frame(V1 = as.integer(n4gram$V1), V2 = as.integer(n4gram$V2),V3 = as.integer(n4gram$V3),V4 = as.integer(n4gram$V4))
+
+n4gramFeat$V1 <- sapply(n4gramFeat$V1,function(x) featMap[x])
+n4gramFeat$V2 <- sapply(n4gramFeat$V2,function(x) featMap[x])
+n4gramFeat$V3 <- sapply(n4gramFeat$V3,function(x) featMap[x])
+
+NNinput <- Matrix(0, nrow = length(n4gramFeat$V1), ncol = numNNfeatures*3, sparse = TRUE)
+
+#featNames <- factor(colnames(n2tableCom)[1:(length(colnames(n2tableCom))/2)])
+#w <- as.integer(factor(n4gram$w, levels = levels(featNames)))
+#test <- sapply(w[1:10], function(x) {if(!is.na(x)) rep(c(0,1,0),c((x-1),1,(length(featNames)*3-x)))})
+
+n1gramFeat[as.integer(n1gram) > 500] <- 
+
+inputOne <- function(x,y,df) df[x,y] <- 1
+
+```
+
